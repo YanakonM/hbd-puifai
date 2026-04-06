@@ -797,10 +797,10 @@ function showScreen(id){
   const display=document.getElementById('countdown-display');
   let mInt=setInterval(drawMatrix,40);
   function tick(){
-    if(count>0){ display.className='countdown-number'; display.textContent=count; count--; setTimeout(tick,800); }
+    if(count>0){ display.className='countdown-number'; display.textContent=count; count--; setTimeout(tick,1000); }
     else {
       let wi=0;
-      function showWord(){ if(wi<words.length){ display.className='countdown-word'; display.textContent=words[wi++]; setTimeout(showWord,700); }
+      function showWord(){ if(wi<words.length){ display.className='countdown-word'; display.textContent=words[wi++]; setTimeout(showWord,1200); }
         else { display.textContent='🎉'; clearInterval(mInt); setTimeout(()=>showScreen('screen-envelope'),900); } }
       showWord();
     }
@@ -915,7 +915,7 @@ function initCarousel(){
 }
 function updateCarouselTransform(){ document.getElementById('carousel-ring').style.transform=`rotateY(${carouselAngle}deg)`; }
 function spinCarousel(dir){ sfx('click'); carouselAngle+=dir*(360/NUM_PHOTOS); updateCarouselTransform(); }
-function startAutoRotate(){ clearInterval(autoRotateId); autoRotateId=setInterval(()=>{ carouselAngle+=0.3; updateCarouselTransform(); },30); }
+function startAutoRotate(){ clearInterval(autoRotateId); autoRotateId=setInterval(()=>{ carouselAngle+=0.12; updateCarouselTransform(); },30); }
 function stopAutoRotate(){ clearInterval(autoRotateId); }
 function attachDragListeners(){
   const scene=document.getElementById('carousel-scene');
