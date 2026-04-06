@@ -403,12 +403,51 @@
       90%  { opacity: 0.7; }
       100% { opacity: 0; transform: translateY(110vh) scale(1.5); }
     }
+    @keyframes beatGlow {
+      0%   { box-shadow: 0 0 20px #ff69b4, 0 0 40px #ff1493; }
+      50%  { box-shadow: 0 0 60px #ff69b4, 0 0 120px #ff1493, 0 0 200px #ff69b4; }
+      100% { box-shadow: 0 0 20px #ff69b4, 0 0 40px #ff1493; }
+    }
+    .beat-pulse { animation: beatGlow 0.32s ease-out !important; }
+    #music-bar {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,20,147,0.15); border: 1px solid rgba(255,105,180,0.4);
+      border-radius: 30px; padding: 6px 16px; z-index: 9999;
+      backdrop-filter: blur(10px); opacity: 0; transition: opacity 1s;
+    }
+    #music-bar.show { opacity: 1; }
+    .music-eq { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
+    .music-eq span {
+      display: inline-block; width: 3px; background: #ff69b4; border-radius: 2px;
+      animation: eqBounce 0.6s ease-in-out infinite alternate;
+    }
+    .music-eq span:nth-child(1){ height:5px;  animation-delay:0s; }
+    .music-eq span:nth-child(2){ height:12px; animation-delay:0.1s; }
+    .music-eq span:nth-child(3){ height:8px;  animation-delay:0.2s; }
+    .music-eq span:nth-child(4){ height:14px; animation-delay:0.05s; }
+    .music-eq span:nth-child(5){ height:6px;  animation-delay:0.15s; }
+    @keyframes eqBounce {
+      from { transform: scaleY(0.3); opacity:0.5; }
+      to   { transform: scaleY(1);   opacity:1; }
+    }
+    #music-bar p { font-family:'Mitr',sans-serif; font-size:0.72rem; color:#ffb6c1; margin:0; }
   </style>
+  <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
 
 <!--  GLITTER  -->
 <div id="glitter"></div>
+
+<!-- YouTube hidden player -->
+<div id="yt-player" style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;"></div>
+
+<!-- Music bar -->
+<div id="music-bar">
+  <div class="music-eq"><span></span><span></span><span></span><span></span><span></span></div>
+  <p>🎵 WWJ — คำอวยพร</p>
+</div>
 
 <!--  CONFETTI  -->
 <canvas id="confetti-canvas"></canvas>
@@ -498,39 +537,80 @@ const PHOTOS = [
 ];
 
 /* ================================================================
-   AUDIO (Web Audio API)
+   AUDIO — YouTube IFrame API + Web Audio SFX
    ================================================================ */
 let _actx = null;
 function actx(){ if(!_actx) _actx = new (window.AudioContext||window.webkitAudioContext)(); if(_actx.state==='suspended') _actx.resume(); return _actx; }
 
-const F = { G4:392,A4:440,B4:494,C5:523,D5:587,E5:659,F5:698,G5:784 };
-const MELODY = [
-  ['G4',.375],['G4',.125],['A4',.5],['G4',.5],['C5',.5],['B4',1],
-  ['G4',.375],['G4',.125],['A4',.5],['G4',.5],['D5',.5],['C5',1],
-  ['G4',.375],['G4',.125],['G5',.5],['E5',.5],['C5',.5],['B4',.5],['A4',1],
-  ['F5',.375],['F5',.125],['E5',.5],['C5',.5],['D5',.5],['C5',1.5]
-];
-let musicTimer = null;
+// YouTube Player
+let ytPlayer = null, ytReady = false, beatInterval = null;
+let beatCount = 0;
 
-function playNote(freq,start,dur,vol=0.09){
-  const c=actx(), o=c.createOscillator(), g=c.createGain();
-  o.connect(g); g.connect(c.destination);
-  o.type='sine'; o.frequency.value=freq;
-  g.gain.setValueAtTime(0,start);
-  g.gain.linearRampToValueAtTime(vol,start+0.04);
-  g.gain.setValueAtTime(vol,start+dur-0.06);
-  g.gain.linearRampToValueAtTime(0,start+dur);
-  o.start(start); o.stop(start+dur);
-}
-function playHBD(){
-  let t=actx().currentTime+0.1, total=0;
-  MELODY.forEach(([n,d])=>{
-    if(n!=='_') playNote(F[n],t,d*0.5);
-    t+=d*0.5; total+=d*0.5;
+function onYouTubeIframeAPIReady(){
+  ytPlayer = new YT.Player('yt-player',{
+    videoId: 'R9K1x4Gk0uY',
+    playerVars:{ autoplay:0, controls:0, loop:1, playlist:'R9K1x4Gk0uY', mute:0 },
+    events:{ onReady: ()=>{ ytReady=true; } }
   });
-  musicTimer = setTimeout(playHBD, (total+1.5)*1000);
 }
-function stopMusic(){ clearTimeout(musicTimer); musicTimer=null; }
+
+function playMusic(){
+  if(ytReady && ytPlayer){
+    ytPlayer.setVolume(45);
+    ytPlayer.playVideo();
+    document.getElementById('music-bar').classList.add('show');
+    startBeatSync();
+  }
+}
+
+function stopMusic(){
+  if(ytPlayer && ytReady) ytPlayer.pauseVideo();
+  clearInterval(beatInterval); beatInterval=null;
+  document.getElementById('music-bar').classList.remove('show');
+}
+
+/* Beat-sync animations ~95 BPM = 632ms per beat */
+const BEAT_MS = 632;
+function startBeatSync(){
+  clearInterval(beatInterval);
+  beatCount = 0;
+  beatInterval = setInterval(()=>{
+    beatCount++;
+    // Every beat: sparkle burst on active screen
+    spawnBeatSparkles();
+    // Every 4 beats: stronger pulse on glitter
+    if(beatCount % 4 === 1) bigBeatPulse();
+    // Beat glow on envelope when on that screen
+    const envEl = document.querySelector('#screen-envelope.active .envelope');
+    if(envEl){ envEl.classList.add('beat-pulse'); setTimeout(()=>envEl.classList.remove('beat-pulse'),320); }
+    // Beat glow on carousel items
+    const frontItem = document.querySelector('#carousel-ring .carousel-item:first-child');
+    if(frontItem){ frontItem.classList.add('beat-pulse'); setTimeout(()=>frontItem.classList.remove('beat-pulse'),320); }
+  }, BEAT_MS);
+}
+
+function spawnBeatSparkles(){
+  const screen = document.querySelector('.screen.active');
+  if(!screen) return;
+  const colors = ['#ff69b4','#ff1493','#ffb6c1','#fff','#d4a0ff'];
+  for(let i=0;i<6;i++){
+    const s = document.createElement('div');
+    s.style.cssText = `position:fixed;width:6px;height:6px;border-radius:50%;pointer-events:none;z-index:9998;
+      background:${colors[i%colors.length]};
+      left:${Math.random()*100}vw; top:${Math.random()*100}vh;
+      opacity:1; transition: opacity 0.4s, transform 0.4s;`;
+    document.body.appendChild(s);
+    requestAnimationFrame(()=>{ s.style.transform=`translate(${(Math.random()-0.5)*80}px,${-40-Math.random()*60}px) scale(0)`; s.style.opacity='0'; });
+    setTimeout(()=>s.remove(), 500);
+  }
+}
+
+function bigBeatPulse(){
+  const bar = document.getElementById('music-bar');
+  bar.style.transform = 'translateX(-50%) scale(1.1)';
+  bar.style.borderColor = '#ff1493';
+  setTimeout(()=>{ bar.style.transform='translateX(-50%) scale(1)'; bar.style.borderColor='rgba(255,105,180,0.4)'; }, 200);
+}
 
 function sfx(type){
   const c=actx(), now=c.currentTime;
@@ -747,7 +827,7 @@ function openEnvelope(){
   if(envelopeOpened) return;
   envelopeOpened=true;
   sfx('click');
-  playHBD();
+  playMusic();
   fireConfetti();
   startBalloons();
   document.getElementById('env-flap').classList.add('open');
