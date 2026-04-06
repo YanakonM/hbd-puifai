@@ -433,15 +433,14 @@
     }
     #music-bar p { font-family:'Mitr',sans-serif; font-size:0.72rem; color:#ffb6c1; margin:0; }
   </style>
-  <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
 
 <!--  GLITTER  -->
 <div id="glitter"></div>
 
-<!-- YouTube hidden player -->
-<div id="yt-player" style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;"></div>
+<!-- Background music -->
+<audio id="bg-music" src="song.mp3" loop preload="auto"></audio>
 
 <!-- Music bar -->
 <div id="music-bar">
@@ -537,35 +536,25 @@ const PHOTOS = [
 ];
 
 /* ================================================================
-   AUDIO — YouTube IFrame API + Web Audio SFX
+   AUDIO — HTML5 Audio + Web Audio SFX
    ================================================================ */
 let _actx = null;
 function actx(){ if(!_actx) _actx = new (window.AudioContext||window.webkitAudioContext)(); if(_actx.state==='suspended') _actx.resume(); return _actx; }
 
-// YouTube Player
-let ytPlayer = null, ytReady = false, beatInterval = null;
-let beatCount = 0;
-
-function onYouTubeIframeAPIReady(){
-  ytPlayer = new YT.Player('yt-player',{
-    videoId: 'R9K1x4Gk0uY',
-    playerVars:{ autoplay:0, controls:0, loop:1, playlist:'R9K1x4Gk0uY', mute:0 },
-    events:{ onReady: ()=>{ ytReady=true; } }
-  });
-}
+let beatInterval = null, beatCount = 0;
 
 function playMusic(){
-  if(ytReady && ytPlayer){
-    ytPlayer.setVolume(45);
-    ytPlayer.playVideo();
-    document.getElementById('music-bar').classList.add('show');
-    startBeatSync();
-  }
+  const audio = document.getElementById('bg-music');
+  audio.volume = 0.45;
+  audio.play().catch(()=>{});
+  document.getElementById('music-bar').classList.add('show');
+  startBeatSync();
 }
 
 function stopMusic(){
-  if(ytPlayer && ytReady) ytPlayer.pauseVideo();
-  clearInterval(beatInterval); beatInterval=null;
+  const audio = document.getElementById('bg-music');
+  audio.pause(); audio.currentTime = 0;
+  clearInterval(beatInterval); beatInterval = null;
   document.getElementById('music-bar').classList.remove('show');
 }
 
