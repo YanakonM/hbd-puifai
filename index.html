@@ -824,8 +824,14 @@ function initCarousel(){
   const ring=document.getElementById('carousel-ring');
   const sceneEl=document.getElementById('carousel-scene');
   ring.innerHTML='';
-  const itemSize=sceneEl.offsetWidth||280;
-  const radius=Math.round(itemSize/(2*Math.tan(Math.PI/NUM_PHOTOS)));
+
+  const itemSize = sceneEl.offsetWidth || 280;
+  const radius   = Math.round(itemSize / (2 * Math.tan(Math.PI / NUM_PHOTOS)));
+
+  // Perspective must be >> radius to avoid extreme zoom on front item
+  const perspective = Math.max(1200, radius * 5);
+  sceneEl.style.perspective = perspective + 'px';
+
   PHOTOS.forEach((src,i)=>{
     const angle=(360/NUM_PHOTOS)*i;
     const item=document.createElement('div'); item.className='carousel-item';
